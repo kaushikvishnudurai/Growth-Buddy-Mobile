@@ -1,0 +1,14 @@
+node_modules/
+www/
+icons/
+
+# Android
+android/.gradle/
+android/app/build/
+android/build/
+android/local.properties
+
+# iOS
+ios/App/Pods/
+ios/App/App/public/
+ios/DerivedData/

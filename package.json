@@ -1,0 +1,20 @@
+{
+  "name": "growth-buddy-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Capacitor wrapper around the Growth-Buddy web app. Web code lives in ../Growth-Buddy; this repo only holds the native shells.",
+  "scripts": {
+    "build:web": "cd ../Growth-Buddy && npm run build && cd - && rm -rf www && cp -r ../Growth-Buddy/dist www",
+    "sync": "npm run build:web && cap sync",
+    "android": "npm run sync && cap open android",
+    "ios": "npm run sync && cap open ios"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.4.1",
+    "@capacitor/core": "^8.4.1",
+    "@capacitor/ios": "^8.4.1"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.4.1"
+  }
+}

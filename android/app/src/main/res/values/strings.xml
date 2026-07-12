@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Growth Buddy</string>
+    <string name="title_activity_main">Growth Buddy</string>
+    <string name="package_name">com.growthbuddy.app</string>
+    <string name="custom_url_scheme">com.growthbuddy.app</string>
+</resources>
