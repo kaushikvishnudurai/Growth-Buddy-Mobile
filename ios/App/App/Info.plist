@@ -47,5 +47,9 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Growth Buddy uses the microphone so you can log things by speaking.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Growth Buddy turns your speech into text to log tasks, food and more.</string>
 </dict>
 </plist>

@@ -10,6 +10,7 @@
     "ios": "npm run sync && cap open ios"
   },
   "dependencies": {
+    "@capacitor-community/speech-recognition": "^7.0.1",
     "@capacitor/android": "^8.4.1",
     "@capacitor/browser": "^8.0.3",
     "@capacitor/core": "^8.4.1",
