@@ -3,10 +3,14 @@
   "appName": "Growth Buddy",
   "webDir": "www",
   "server": {
-    "cleartext": true
+    "androidScheme": "https"
   },
   "plugins": {
-    "CapacitorHttp": { "enabled": true },
-    "CapacitorCookies": { "enabled": true }
+    "CapacitorHttp": {
+      "enabled": true
+    },
+    "CapacitorCookies": {
+      "enabled": true
+    }
   }
 }

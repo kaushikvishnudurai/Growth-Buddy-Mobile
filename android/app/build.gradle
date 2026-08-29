@@ -16,10 +16,35 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    // Release signing. Play Store rejects the debug key Capacitor ships with, but
+    // the keystore itself must never live in the repo — point at it with env vars:
+    //   GB_KEYSTORE=/abs/path/gb-release.jks GB_KEYSTORE_PASSWORD=... \
+    //   GB_KEY_ALIAS=gb GB_KEY_PASSWORD=... ./gradlew assembleRelease
+    // Create one once:
+    //   keytool -genkeypair -v -keystore gb-release.jks -keyalg RSA -keysize 2048 \
+    //           -validity 10000 -alias gb
+    // Losing that file means you can never update the app under this listing again.
+    signingConfigs {
+        release {
+            def store = System.getenv("GB_KEYSTORE")
+            if (store) {
+                storeFile file(store)
+                storePassword System.getenv("GB_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("GB_KEY_ALIAS")
+                keyPassword System.getenv("GB_KEY_PASSWORD")
+            }
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            // Unsigned when the env vars are absent, so local debug builds still
+            // work; a release build without them fails at the signing step rather
+            // than quietly producing a debug-signed APK you can't publish.
+            if (System.getenv("GB_KEYSTORE")) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }
