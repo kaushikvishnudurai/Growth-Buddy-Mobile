@@ -15,3 +15,9 @@ ios/DerivedData/
 
 # IDE
 .idea/
+
+# Release signing key — never in the repo (build.gradle reads GB_KEYSTORE).
+*.jks
+*.keystore
+keystore.properties
+signing.env
