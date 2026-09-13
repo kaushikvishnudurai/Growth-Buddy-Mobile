@@ -11,6 +11,14 @@
     },
     "CapacitorCookies": {
       "enabled": true
+    },
+    "SplashScreen": {
+      "launchAutoHide": false,
+      "launchFadeOutDuration": 200,
+      "backgroundColor": "#F97316",
+      "showSpinner": false,
+      "androidScaleType": "CENTER_CROP",
+      "androidSplashResourceName": "splash"
     }
   }
 }
