@@ -32,4 +32,17 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- A reminder is an alarm the user set, so it has to land on the minute.
+         Without this, targetSdk 36 means canScheduleExactAlarms() is false by
+         default on Android 14+, the plugin silently falls back to
+         setAndAllowWhileIdle(), and Doze batches a 09:00 reminder to whenever
+         it next feels like waking - usually 9-15 minutes late, sometimes more.
+         USE_EXACT_ALARM is granted at install with no prompt; SCHEDULE_EXACT_ALARM
+         (declared by the plugin) is not, on 14+.
+         ponytail: no in-app fallback UI. The plugin exposes
+         checkExactNotificationSetting/changeExactNotificationSetting to walk the
+         user to Settings - add that only if Play refuses the USE_EXACT_ALARM
+         declaration. -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
 </manifest>
