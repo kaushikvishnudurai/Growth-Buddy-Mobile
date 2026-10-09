@@ -88,8 +88,9 @@ its own: the OS already counts steps, so there is no battery cost.
 - Android: minSdk 26 (Health Connect's floor). The plugin declares ~50 health permissions;
   `AndroidManifest.xml` strips all of them except `READ_STEPS`, because Play asks you to justify
   every one. Health Connect's "Privacy policy" link opens `public/privacy.html` (string
-  `health_connect_privacy_policy_url`). Play Console needs the Health apps declaration form
-  before release. Health Connect only has steps if something writes them: the phone itself on
+  `health_connect_privacy_policy_url`). The APK is shared directly for now; if it ever goes on
+  Play, Play Console needs the Health apps declaration form first. On Android 13 and below,
+  Health Connect is a separate app from Play; 14+ has it built in. Health Connect only has steps if something writes them: the phone itself on
   newer Android versions, or Fit, Samsung Health or a watch app.
 - iOS: `App.entitlements` turns on HealthKit, and `NSHealthShareUsageDescription` is set. The App
   ID also needs the HealthKit capability in the developer portal.
