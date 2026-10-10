@@ -47,6 +47,8 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSHealthShareUsageDescription</key>
+	<string>Growth Buddy reads your step count from Health to fill in a Steps habit when you log it.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Growth Buddy uses the microphone so you can log things by speaking.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
