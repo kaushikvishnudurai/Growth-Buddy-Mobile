@@ -24,7 +24,7 @@ cd ../Growth-Buddy-Mobile
 VITE_API_BASE=https://growth-buddy-cu63.onrender.com npm run sync
 ```
 
-`npm run sync` = `build:web` + `cap sync`. Run it after **any** web change.
+`npm run sync` = `build:web` + `cap sync`. Run it after **any** web change. It builds `../Growth-Buddy` as checked out; to build another worktree (e.g. a `main` worktree while that checkout is on a feature branch), `GB_WEB=../Growth-Buddy-main npm run sync`.
 Verify the URL landed: `grep -o 'onrender[^"]*' android/app/src/main/assets/public/assets/index-*.js`
 
 Then:
