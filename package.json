@@ -16,8 +16,10 @@
     "@capacitor/browser": "^8.0.3",
     "@capacitor/core": "^8.4.1",
     "@capacitor/device": "^8.0.3",
+    "@capacitor/filesystem": "^8.1.4",
     "@capacitor/ios": "^8.4.1",
     "@capacitor/local-notifications": "^8.3.1",
+    "@capacitor/share": "^8.0.3",
     "@capacitor/splash-screen": "^8.0.2",
     "@capacitor/status-bar": "^8.0.3",
     "@capgo/capacitor-health": "^8.11.8"

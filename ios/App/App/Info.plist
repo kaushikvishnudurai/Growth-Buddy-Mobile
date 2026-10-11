@@ -52,7 +52,9 @@
 	<key>NSCameraUsageDescription</key>
 	<string>Growth Buddy uses the camera to scan a food barcode.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Growth Buddy uses the microphone so you can log things by speaking.</string>
+	<string>Growth Buddy uses the microphone so you can log things by speaking and record your own reminder tones.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Growth Buddy saves the share cards you create to your photo library when you choose Save Image.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Growth Buddy turns your speech into text to log tasks, food and more.</string>
 </dict>

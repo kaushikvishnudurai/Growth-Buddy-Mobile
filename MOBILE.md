@@ -79,6 +79,21 @@ Pointed at production: `https://growth-buddy-cu63.onrender.com` (Render free tie
   is the emulator itself): `VITE_API_BASE=http://10.0.2.2:8080 npm run sync`
   (`10.0.2.2` is the Android emulator's alias for the host machine).
 
+## Files and permissions
+
+- `@capacitor/filesystem` + `@capacitor/share`: every export (Money and Report share cards, Download
+  my data, reminders .ics, money CSV) goes through the web repo's `native.js` `saveFile`, which
+  writes to the cache dir and opens the share sheet. The WebView has no download handler, so
+  without these two a blob download is silently dropped. Share uses the app's existing
+  `${applicationId}.fileprovider` (`res/xml/file_paths.xml` already exposes `cache-path`).
+  After `npm install`, a `cap sync` is needed to register them in the Android/iOS projects.
+- `AndroidManifest.xml`: `CAMERA` (barcode scanner, photo capture) and `RECORD_AUDIO` +
+  `MODIFY_AUDIO_SETTINGS` (custom tone recording). Capacitor's `BridgeWebChromeClient` turns a
+  WebView getUserMedia into a runtime prompt only for permissions the manifest declares; an
+  undeclared one is refused with no dialog. iOS: `NSCameraUsageDescription`,
+  `NSMicrophoneUsageDescription`, and `NSPhotoLibraryAddUsageDescription` (the share sheet's
+  Save Image).
+
 ## Health (HealthKit / Health Connect, read only)
 
 `@capgo/capacitor-health` reads what the OS health store already holds: today's steps for a Steps

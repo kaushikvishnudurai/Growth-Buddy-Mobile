@@ -42,6 +42,17 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
+    <!-- Recording a custom reminder tone (chime.js recordCustomChime, getUserMedia
+         audio). BridgeWebChromeClient asks for MODIFY_AUDIO_SETTINGS and RECORD_AUDIO
+         together and grants the WebView only when both come back granted; with
+         MODIFY_AUDIO_SETTINGS undeclared that was a silent "blocked" every time.
+         RECORD_AUDIO also arrives from the speech-recognition plugin, but is declared
+         here so the recorder does not depend on that plugin staying installed.
+         MODIFY_AUDIO_SETTINGS is a normal permission: granted at install, no prompt. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
+
     <!-- A reminder is an alarm the user set, so it has to land on the minute.
          Without this, targetSdk 36 means canScheduleExactAlarms() is false by
          default on Android 14+, the plugin silently falls back to
