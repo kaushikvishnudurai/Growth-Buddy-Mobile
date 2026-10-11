@@ -34,6 +34,14 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- The food barcode scanner's getUserMedia. Capacitor's BridgeWebChromeClient
+         turns the WebView's onPermissionRequest into the runtime CAMERA prompt, but
+         Android denies a permission the manifest never declared without showing
+         anything, so the web side read "refused" for a question never asked.
+         required="false": a phone without a camera can still install the app. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+
     <!-- A reminder is an alarm the user set, so it has to land on the minute.
          Without this, targetSdk 36 means canScheduleExactAlarms() is false by
          default on Android 14+, the plugin silently falls back to
