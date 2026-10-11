@@ -79,18 +79,49 @@ Pointed at production: `https://growth-buddy-cu63.onrender.com` (Render free tie
   is the emulator itself): `VITE_API_BASE=http://10.0.2.2:8080 npm run sync`
   (`10.0.2.2` is the Android emulator's alias for the host machine).
 
-## Steps (HealthKit / Health Connect)
+## Health (HealthKit / Health Connect, read only)
 
-`@capgo/capacitor-health` reads today's step total when a Steps habit's check-in opens
-(`readTodaySteps` in the web repo's `scripts/native.js`). It never runs a sensor or service of
-its own: the OS already counts steps, so there is no battery cost.
+`@capgo/capacitor-health` reads what the OS health store already holds: today's steps for a Steps
+habit, last night's sleep, and the Health summary screen. The read set is `HEALTH_READ` in the web
+repo's `scripts/native.js`; only `requestHealthAccess()` opens a permission sheet, every other read
+just reads. It never runs a sensor or service of its own, so there is no battery cost, and it never
+writes anything back.
 
 - Android: minSdk 26 (Health Connect's floor). The plugin declares ~50 health permissions;
-  `AndroidManifest.xml` strips all of them except `READ_STEPS`, because Play asks you to justify
-  every one. Health Connect's "Privacy policy" link opens `public/privacy.html` (string
+  `AndroidManifest.xml` keeps the `READ_*` for exactly `HEALTH_READ` and strips every `WRITE_*`
+  and every other `READ_*` (VO2 max, blood glucose, body and basal temperature, basal metabolic
+  rate, total calories, mindfulness, hydration, nutrition), because Play asks you to justify every
+  one. Adding a type means `HEALTH_READ`, the manifest and a line below, in one change.
+  Health Connect's "Privacy policy" link opens `public/privacy.html` (string
   `health_connect_privacy_policy_url`). The APK is shared directly for now; if it ever goes on
   Play, Play Console needs the Health apps declaration form first. On Android 13 and below,
-  Health Connect is a separate app from Play; 14+ has it built in. Health Connect only has steps if something writes them: the phone itself on
-  newer Android versions, or Fit, Samsung Health or a watch app.
-- iOS: `App.entitlements` turns on HealthKit, and `NSHealthShareUsageDescription` is set. The App
-  ID also needs the HealthKit capability in the developer portal.
+  Health Connect is a separate app from Play; 14+ has it built in. Health Connect only has data if
+  something writes it: the phone itself on newer Android versions, or Fit, Samsung Health or a
+  watch app.
+- No `READ_HEALTH_DATA_HISTORY`: Health Connect returns at most 30 days before the first grant,
+  so a weight logged months before install is not shown. Body measurements look back 90 days;
+  adding it needs the manifest entry plus `requestHistoryAccess: true` on the request.
+- iOS: `App.entitlements` turns on HealthKit (no clinical records, no background delivery), and
+  `NSHealthShareUsageDescription` is set. No `NSHealthUpdateUsageDescription`: the request passes
+  only `read`, so the plugin asks HealthKit for an empty share set. The App ID also needs the
+  HealthKit capability in the developer portal.
+
+Per-permission justification (one line each, reusable in the Play Console health declaration):
+
+| Permission | Plugin type | Why Growth Buddy reads it |
+|---|---|---|
+| `READ_STEPS` | steps | Fills in the user's Steps habit with today's step count and shows daily steps in the Health summary. |
+| `READ_DISTANCE` | distance | Shows the distance walked or run today, and each workout's distance, in the Health summary. |
+| `READ_ACTIVE_CALORIES_BURNED` | calories | Shows active calories burned today, and per workout, in the Health summary. |
+| `READ_FLOORS_CLIMBED` | flightsClimbed | Shows floors climbed today in the Health summary's activity section. |
+| `READ_SLEEP` | sleep | Fills in last night's sleep automatically so the user does not have to log bedtime and wake time by hand. |
+| `READ_HEART_RATE` | heartRate | Shows today's heart rate range in the Health summary. |
+| `READ_RESTING_HEART_RATE` | restingHeartRate | Shows resting heart rate in the Health summary as a recovery indicator. |
+| `READ_HEART_RATE_VARIABILITY` | heartRateVariability | Shows heart rate variability in the Health summary as a recovery indicator. |
+| `READ_OXYGEN_SATURATION` | oxygenSaturation | Shows the latest blood oxygen reading in the Health summary. |
+| `READ_RESPIRATORY_RATE` | respiratoryRate | Shows the latest respiratory rate in the Health summary. |
+| `READ_WEIGHT` | weight | Shows the user's latest weight in the Health summary's body measurements. |
+| `READ_HEIGHT` | height | Shows the user's height in the Health summary's body measurements. |
+| `READ_BODY_FAT` | bodyFat | Shows the latest body fat percentage in the Health summary's body measurements. |
+| `READ_BLOOD_PRESSURE` | bloodPressure | Shows the latest blood pressure reading in the Health summary. |
+| `READ_EXERCISE` | workouts | Lists the past week's workouts in the Health summary. |

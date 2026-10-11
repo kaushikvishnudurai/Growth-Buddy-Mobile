@@ -48,7 +48,7 @@
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
 	<key>NSHealthShareUsageDescription</key>
-	<string>Growth Buddy reads your step count from Health to fill in a Steps habit when you log it.</string>
+	<string>Growth Buddy reads, and never writes, your steps, activity, sleep, heart readings, body measurements and workouts from Health. It uses them to fill in habits and sleep for you and to show your Health summary.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Growth Buddy uses the microphone so you can log things by speaking.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
