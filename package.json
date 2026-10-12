@@ -7,7 +7,8 @@
     "build:web": "cd \"${GB_WEB:-../Growth-Buddy}\" && VITE_API_BASE=\"${GB_API_BASE:-https://growth-buddy-cu63.onrender.com}\" npm run build && cd - && rm -rf www && cp -r \"${GB_WEB:-../Growth-Buddy}/dist\" www",
     "sync": "npm run build:web && cap sync",
     "android": "npm run sync && cap open android",
-    "ios": "npm run sync && cap open ios"
+    "ios": "npm run sync && cap open ios",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@capacitor-community/speech-recognition": "^7.0.1",
@@ -25,6 +26,7 @@
     "@capgo/capacitor-health": "^8.11.8"
   },
   "devDependencies": {
-    "@capacitor/cli": "^8.4.1"
+    "@capacitor/cli": "^8.4.1",
+    "patch-package": "^8.0.1"
   }
 }

@@ -21,6 +21,18 @@
             </intent-filter>
         </activity>
 
+        <!-- Notification buttons (Done, Snooze, +250 ml) handled without opening
+             the app. The patched LocalNotifications plugin (patches/) sends a press
+             here whenever a receiver for this action exists. Not exported: only our
+             own PendingIntents reach it. -->
+        <receiver
+            android:name="com.growthbuddy.actions.NotificationActionReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="${applicationId}.NOTIFICATION_ACTION" />
+            </intent-filter>
+        </receiver>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

@@ -140,3 +140,14 @@ Per-permission justification (one line each, reusable in the Play Console health
 | `READ_BODY_FAT` | bodyFat | Shows the latest body fat percentage in the Health summary's body measurements. |
 | `READ_BLOOD_PRESSURE` | bloodPressure | Shows the latest blood pressure reading in the Health summary. |
 | `READ_EXERCISE` | workouts | Lists the past week's workouts in the Health summary. |
+
+## Notification buttons run in the background (Android)
+
+`patches/@capacitor+local-notifications+*.patch` (applied by `postinstall: patch-package`) makes a
+button on a local notification broadcast `<applicationId>.NOTIFICATION_ACTION` instead of launching
+the activity, whenever the app declares a receiver for it. `NotificationActionReceiver`
+(`com.growthbuddy.actions`) then makes the same call the web app's `handleNotificationAction` would
+(reminder done / snooze, habit check-in, +250 ml water) with the session token the web app mirrors
+through `NotificationActionsPlugin.setAuth`, and re-posts a snoozed card at `snoozedUntil`.
+Upgrading `@capacitor/local-notifications`: re-check that the patch still applies (`npm i` fails
+loudly if not). iOS is unpatched: its buttons are `foreground` and open the app.

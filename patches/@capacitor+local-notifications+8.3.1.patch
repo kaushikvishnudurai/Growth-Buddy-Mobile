@@ -1,0 +1,32 @@
+diff --git a/node_modules/@capacitor/local-notifications/android/src/main/kotlin/com/capacitorjs/plugins/localnotifications/LocalNotificationManager.kt b/node_modules/@capacitor/local-notifications/android/src/main/kotlin/com/capacitorjs/plugins/localnotifications/LocalNotificationManager.kt
+index 72c31a7..71248e5 100644
+--- a/node_modules/@capacitor/local-notifications/android/src/main/kotlin/com/capacitorjs/plugins/localnotifications/LocalNotificationManager.kt
++++ b/node_modules/@capacitor/local-notifications/android/src/main/kotlin/com/capacitorjs/plugins/localnotifications/LocalNotificationManager.kt
+@@ -251,13 +251,20 @@ class LocalNotificationManager(
+         if (actionTypeId != null) {
+             val actionGroup = storage.getActionGroup(actionTypeId)
+             for (notificationAction in actionGroup) {
+-                val actionIntent = buildIntent(localNotification, notificationAction.id)
+-                val actionPendingIntent = PendingIntent.getActivity(
+-                    context,
+-                    id + (notificationAction.id?.hashCode() ?: 0),
+-                    actionIntent,
+-                    flags
+-                )
++                // Growth Buddy patch: when the app declares a receiver for
++                // <package>.NOTIFICATION_ACTION, a button is handled there, in the
++                // background, instead of launching the activity.
++                val requestCode = id + (notificationAction.id?.hashCode() ?: 0)
++                val backgroundIntent = Intent(context.packageName + ".NOTIFICATION_ACTION")
++                    .setPackage(context.packageName)
++                    .putExtra(NOTIFICATION_INTENT_KEY, id)
++                    .putExtra(ACTION_INTENT_KEY, notificationAction.id)
++                    .putExtra(NOTIFICATION_OBJ_INTENT_KEY, localNotification.source)
++                val actionPendingIntent = if (context.packageManager.queryBroadcastReceivers(backgroundIntent, 0).isNotEmpty()) {
++                    PendingIntent.getBroadcast(context, requestCode, backgroundIntent, flags)
++                } else {
++                    PendingIntent.getActivity(context, requestCode, buildIntent(localNotification, notificationAction.id), flags)
++                }
+                 val actionBuilder = NotificationCompat.Action.Builder(
+                     R.drawable.ic_transparent,
+                     notificationAction.title,
