@@ -103,7 +103,7 @@ public class NotificationActionReceiver extends BroadcastReceiver {
         NotificationActionsPlugin.announceChange();
         if (answer != null && shown != null) ringAgain(context, id, shown, answer.optString("snoozedUntil"));
         if ("snooze".equals(action)) toast(context, "Snoozed.");
-        else if ("water".equals(action)) toast(context, "Logged " + WATER_ML + " ml of water.");
+        else if ("water".equals(action)) toast(context, "Logged " + WATER_ML + " ml. Your body thanks you for the water.");
         else toast(context, "Marked done.");
         return null;
     }

@@ -1,10 +1,16 @@
 package com.growthbuddy.customsound;
 
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.content.Context;
-import android.media.MediaPlayer;
-import android.util.Log;
+import android.content.Intent;
+import android.media.AudioAttributes;
+import android.net.Uri;
+import android.util.Base64;
 
-import com.getcapacitor.JSObject;
+import androidx.core.content.FileProvider;
+
+import com.getcapacitor.JSArray;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
@@ -12,206 +18,126 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
- * Capacitor plugin for custom notification sounds.
- * 
- * Handles downloading custom sounds from server and caching locally
- * so LocalNotifications can reference them by file path.
- * 
- * Android limitation: LocalNotifications resolves sound from app assets
- * or app cache directory. Cannot load from arbitrary URLs at notification time.
- * This plugin bridges that gap by pre-downloading and caching.
+ * A notification channel that rings with the user's OWN sound (an upload or a
+ * recording). The web app keeps those as data URLs; Android takes a channel's
+ * sound from a URI it can open, and LocalNotifications only builds res/raw ones.
+ * So the bytes are written to filesDir/gb_sounds/, served through the app's
+ * FileProvider (res/xml/file_paths.xml), and read access is granted to System
+ * UI, the process that actually plays a notification's sound.
+ *
+ * A channel is frozen once created, so its id carries the sound's id
+ * (gb-tone-custom-<id8>, push.js channelForTone): a new upload is a new
+ * channel, never an edit of an old one. Called from native.js ensureChannel.
  */
 @CapacitorPlugin(name = "CustomNotificationSound")
 public class CustomNotificationSoundPlugin extends Plugin {
-    private static final String TAG = "CustomSound";
-    private static final String CACHE_DIR = "custom_sounds";
-    private static final String DEFAULT_FILENAME = "custom_notification.wav";
-    private static final long DOWNLOAD_TIMEOUT_MS = 30_000;
-    
-    private AtomicBoolean isDownloading = new AtomicBoolean(false);
-    private MediaPlayer mediaPlayer;
-    
-    /**
-     * Download sound from signed URL and cache locally.
-     * Returns the file path that can be used with LocalNotifications.
-     */
+    private static final String DIR = "gb_sounds";
+    private static final String PREFIX = "gb-tone-custom-";
+    // The web side caps an upload at 300 kB; this is only the backstop.
+    private static final int MAX_BYTES = 1024 * 1024;
+
     @PluginMethod
-    public void downloadAndCache(PluginCall call) {
-        String stratusKey = call.getString("stratusKey");
-        String signedUrl = call.getString("signedUrl");
-        String fileName = call.getString("fileName", DEFAULT_FILENAME);
-        
-        if (stratusKey == null || signedUrl == null) {
-            call.reject("Missing stratusKey or signedUrl");
+    public void ensureChannel(PluginCall call) {
+        String id = call.getString("id");
+        String name = call.getString("name", "Reminders");
+        String dataUrl = call.getString("dataUrl");
+        // The id becomes a file name: nothing but our own prefix and [a-z0-9-].
+        if (id == null || !id.matches(PREFIX + "[a-z0-9-]+") || dataUrl == null) {
+            call.reject("id (" + PREFIX + "...) and dataUrl are required");
             return;
         }
-        
-        // Prevent concurrent downloads
-        if (!isDownloading.compareAndSet(false, true)) {
-            call.reject("Download already in progress");
-            return;
-        }
-        
-        // Download in background thread
-        new Thread(() -> {
-            try {
-                File cacheDir = getCacheDirectory();
-                File soundFile = new File(cacheDir, sanitizeFileName(fileName));
-                
-                downloadFile(signedUrl, soundFile);
-                
-                // Return the file path that LocalNotifications can use
-                String filePath = soundFile.getAbsolutePath();
-                JSObject result = new JSObject();
-                result.put("filePath", filePath);
-                
-                Log.d(TAG, "Sound cached: " + filePath + " (" + soundFile.length() + " bytes)");
-                call.resolve(result);
-            } catch (Exception e) {
-                Log.e(TAG, "Download failed", e);
-                call.reject("Failed to download sound: " + e.getMessage());
-            } finally {
-                isDownloading.set(false);
-            }
-        }).start();
-    }
-    
-    /**
-     * Get path of cached custom sound, or null if not cached.
-     */
-    @PluginMethod
-    public void getCachedPath(PluginCall call) {
-        String fileName = call.getString("fileName", DEFAULT_FILENAME);
-        File cacheDir = getCacheDirectory();
-        File soundFile = new File(cacheDir, sanitizeFileName(fileName));
-        
-        JSObject result = new JSObject();
-        if (soundFile.exists()) {
-            result.put("filePath", soundFile.getAbsolutePath());
-        } else {
-            result.put("filePath", (String) null);
-        }
-        
-        call.resolve(result);
-    }
-    
-    /**
-     * Delete cached sound file.
-     */
-    @PluginMethod
-    public void deleteCache(PluginCall call) {
-        String fileName = call.getString("fileName", DEFAULT_FILENAME);
-        File cacheDir = getCacheDirectory();
-        File soundFile = new File(cacheDir, sanitizeFileName(fileName));
-        
-        if (soundFile.exists() && soundFile.delete()) {
-            Log.d(TAG, "Deleted cached sound: " + soundFile.getAbsolutePath());
+        Context ctx = getContext();
+        NotificationManager nm = ctx.getSystemService(NotificationManager.class);
+        if (nm.getNotificationChannel(id) != null) {
             call.resolve();
-        } else if (!soundFile.exists()) {
-            call.resolve();  // Already gone
-        } else {
-            call.reject("Failed to delete cache file");
-        }
-    }
-    
-    /**
-     * Check if download is in progress.
-     */
-    @PluginMethod
-    public void isDownloading(PluginCall call) {
-        JSObject result = new JSObject();
-        result.put("downloading", isDownloading.get());
-        call.resolve(result);
-    }
-    
-    /**
-     * Test play the sound via MediaPlayer (for verification).
-     */
-    @PluginMethod
-    public void testPlay(PluginCall call) {
-        String filePath = call.getString("filePath");
-        if (filePath == null) {
-            call.reject("Missing filePath");
             return;
         }
-        
+        int comma = dataUrl.indexOf(',');
+        int semi = dataUrl.indexOf(';');
+        if (!dataUrl.startsWith("data:audio/") || comma < 0 || semi < 0 || semi > comma
+                || !dataUrl.substring(0, comma).endsWith(";base64")) {
+            call.reject("dataUrl must be a base64 audio data URL");
+            return;
+        }
         try {
-            if (mediaPlayer != null) {
-                mediaPlayer.release();
+            byte[] bytes = Base64.decode(dataUrl.substring(comma + 1), Base64.DEFAULT);
+            if (bytes.length == 0 || bytes.length > MAX_BYTES) {
+                call.reject("sound is empty or too large");
+                return;
             }
-            
-            mediaPlayer = new MediaPlayer();
-            mediaPlayer.setDataSource(filePath);
-            mediaPlayer.prepare();
-            mediaPlayer.start();
-            
-            Log.d(TAG, "Playing test sound: " + filePath);
+            File dir = new File(ctx.getFilesDir(), DIR);
+            dir.mkdirs();
+            File file = new File(dir, id + extension(dataUrl.substring(5, semi)));
+            try (FileOutputStream out = new FileOutputStream(file)) {
+                out.write(bytes);
+            }
+            Uri uri = FileProvider.getUriForFile(ctx, ctx.getPackageName() + ".fileprovider", file);
+            ctx.grantUriPermission("com.android.systemui", uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            // HIGH, as native.js builds the built-in tones: the one that banners.
+            NotificationChannel channel = new NotificationChannel(id, name, NotificationManager.IMPORTANCE_HIGH);
+            channel.setSound(uri, new AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build());
+            channel.enableVibration(true);
+            nm.createNotificationChannel(channel);
             call.resolve();
         } catch (Exception e) {
-            Log.e(TAG, "Playback failed", e);
-            call.reject("Failed to play sound: " + e.getMessage());
+            call.reject("could not build the channel: " + e.getMessage());
         }
     }
-    
-    // ---- Private helpers ----
-    
-    private File getCacheDirectory() {
-        Context context = getContext();
-        File cacheDir = new File(context.getCacheDir(), CACHE_DIR);
-        if (!cacheDir.exists()) {
-            cacheDir.mkdirs();
-        }
-        return cacheDir;
-    }
-    
-    /**
-     * Download file from signed URL with timeout.
-     * Follows HTTP redirects and respects content-length.
-     */
-    private void downloadFile(String urlString, File destFile) throws Exception {
-        URL url = new URL(urlString);
-        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-        
+
+    /** Drop our custom channels, and their files, whose id is not in `keep` (a deleted sound). */
+    @PluginMethod
+    public void prune(PluginCall call) {
+        Set<String> keep = new HashSet<>();
         try {
-            conn.setConnectTimeout((int) DOWNLOAD_TIMEOUT_MS);
-            conn.setReadTimeout((int) DOWNLOAD_TIMEOUT_MS);
-            conn.setInstanceFollowRedirects(true);
-            
-            int status = conn.getResponseCode();
-            if (status < 200 || status >= 300) {
-                throw new Exception("HTTP " + status + ": " + conn.getResponseMessage());
-            }
-            
-            long contentLength = conn.getContentLengthLong();
-            if (contentLength > 10 * 1024 * 1024) {  // 10 MB limit
-                throw new Exception("File too large: " + contentLength + " bytes");
-            }
-            
-            try (InputStream in = conn.getInputStream();
-                 FileOutputStream out = new FileOutputStream(destFile)) {
-                
-                byte[] buffer = new byte[8192];
-                int bytesRead;
-                while ((bytesRead = in.read(buffer)) != -1) {
-                    out.write(buffer, 0, bytesRead);
-                }
-            }
-        } finally {
-            conn.disconnect();
+            keep.addAll(call.getArray("keep", new JSArray()).<String>toList());
+        } catch (Exception e) {
+            call.reject("keep must be a list of channel ids");
+            return;
         }
+        Context ctx = getContext();
+        NotificationManager nm = ctx.getSystemService(NotificationManager.class);
+        for (NotificationChannel c : nm.getNotificationChannels()) {
+            if (c.getId().startsWith(PREFIX) && !keep.contains(c.getId())) nm.deleteNotificationChannel(c.getId());
+        }
+        File[] files = new File(ctx.getFilesDir(), DIR).listFiles();
+        if (files != null) {
+            for (File f : files) {
+                String n = f.getName();
+                if (!keep.contains(n.contains(".") ? n.substring(0, n.lastIndexOf('.')) : n)) f.delete();
+            }
+        }
+        call.resolve();
     }
-    
-    /**
-     * Sanitize filename to prevent path traversal attacks.
-     */
-    private String sanitizeFileName(String fileName) {
-        // Allow only alphanumeric, dots, and underscores
-        return fileName.replaceAll("[^a-zA-Z0-9._-]", "_");
+
+    // The extension is how the player picks a decoder for a content:// file.
+    private static String extension(String mime) {
+        switch (mime) {
+            case "audio/mpeg":
+            case "audio/mp3":
+                return ".mp3";
+            case "audio/wav":
+            case "audio/x-wav":
+            case "audio/wave":
+                return ".wav";
+            case "audio/ogg":
+                return ".ogg";
+            case "audio/webm":
+                return ".webm";
+            case "audio/aac":
+                return ".aac";
+            case "audio/mp4":
+            case "audio/x-m4a":
+            case "audio/m4a":
+                return ".m4a";
+            default:
+                return ".audio";
+        }
     }
 }
