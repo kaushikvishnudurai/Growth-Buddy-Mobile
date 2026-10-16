@@ -52,7 +52,17 @@ public class CustomNotificationSoundPlugin extends Plugin {
         }
         Context ctx = getContext();
         NotificationManager nm = ctx.getSystemService(NotificationManager.class);
-        if (nm.getNotificationChannel(id) != null) {
+        NotificationChannel existing = nm.getNotificationChannel(id);
+        if (existing != null) {
+            // A URI grant does not survive a reboot, and System UI can't read the
+            // file without one: the sound fell to the default after the first
+            // restart. Re-granted on every app launch (native.js asks once per id
+            // per session). ponytail: between a reboot and the next app open it
+            // still can't read it; a BOOT_COMPLETED receiver re-granting would close that.
+            Uri sound = existing.getSound();
+            if (sound != null && (ctx.getPackageName() + ".fileprovider").equals(sound.getAuthority())) {
+                ctx.grantUriPermission("com.android.systemui", sound, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            }
             call.resolve();
             return;
         }

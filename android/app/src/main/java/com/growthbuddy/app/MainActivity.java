@@ -5,6 +5,7 @@ import android.os.Bundle;
 import com.getcapacitor.BridgeActivity;
 import com.growthbuddy.actions.NotificationActionsPlugin;
 import com.growthbuddy.customsound.CustomNotificationSoundPlugin;
+import com.growthbuddy.permissions.AppPermissionsPlugin;
 
 public class MainActivity extends BridgeActivity {
 
@@ -17,6 +18,7 @@ public class MainActivity extends BridgeActivity {
         // is built and its plugin list is frozen.
         registerPlugin(CustomNotificationSoundPlugin.class);
         registerPlugin(NotificationActionsPlugin.class);
+        registerPlugin(AppPermissionsPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

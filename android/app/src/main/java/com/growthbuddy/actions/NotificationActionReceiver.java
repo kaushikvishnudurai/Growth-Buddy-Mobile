@@ -2,6 +2,7 @@ package com.growthbuddy.actions;
 
 import android.app.AlarmManager;
 import android.app.Notification;
+import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
@@ -35,7 +36,8 @@ import java.util.UUID;
  * The patched LocalNotifications plugin (patches/) sends the press here instead
  * of launching the app. Each is the same call the app's
  * handleNotificationAction makes, sent with the token NotificationActionsPlugin
- * keeps. Success clears the card (Snooze re-posts it at snoozedUntil); a failure
+ * keeps. Success clears the card (Snooze re-posts it at snoozedUntil; +250 ml
+ * swaps it for a thank-you card); a failure
  * leaves it up with a toast, so the press can be tried again or done in the app.
  */
 public class NotificationActionReceiver extends BroadcastReceiver {
@@ -103,9 +105,33 @@ public class NotificationActionReceiver extends BroadcastReceiver {
         NotificationActionsPlugin.announceChange();
         if (answer != null && shown != null) ringAgain(context, id, shown, answer.optString("snoozedUntil"));
         if ("snooze".equals(action)) toast(context, "Snoozed.");
-        else if ("water".equals(action)) toast(context, "Logged " + WATER_ML + " ml. Your body thanks you for the water.");
+        else if ("water".equals(action)) thank(context, id, shown);
         else toast(context, "Marked done.");
         return null;
+    }
+
+    /* The +250 ml press: a thank-you card where the water nudge was (a toast was
+       easy to miss with the shade open). Its own quiet channel, so it neither rings
+       nor pops over what the user is doing, and it clears itself. */
+    private static final String THANKS_CHANNEL = "gb-thanks";
+
+    private static void thank(Context context, int id, Notification shown) {
+        NotificationManager nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+        if (nm.getNotificationChannel(THANKS_CHANNEL) == null) {
+            nm.createNotificationChannel(new NotificationChannel(THANKS_CHANNEL, "Thank-you notes", NotificationManager.IMPORTANCE_LOW));
+        }
+        Intent open = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
+        Notification.Builder b = new Notification.Builder(context, THANKS_CHANNEL)
+                .setContentTitle("Thank you for the water")
+                .setContentText("Logged " + WATER_ML + " ml. Your body thanks you.")
+                .setAutoCancel(true)
+                .setTimeoutAfter(10_000);
+        if (shown != null && shown.getSmallIcon() != null) b.setSmallIcon(shown.getSmallIcon());
+        else b.setSmallIcon(context.getApplicationInfo().icon);
+        if (open != null) {
+            b.setContentIntent(PendingIntent.getActivity(context, id, open, PendingIntent.FLAG_IMMUTABLE));
+        }
+        nm.notify(id, b.build());
     }
 
     private static Notification activeNotification(Context context, int id) {
