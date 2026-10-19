@@ -1,5 +1,96 @@
+diff --git a/node_modules/@capacitor/local-notifications/android/src/main/kotlin/com/capacitorjs/plugins/localnotifications/GbOnTime.kt b/node_modules/@capacitor/local-notifications/android/src/main/kotlin/com/capacitorjs/plugins/localnotifications/GbOnTime.kt
+new file mode 100644
+index 0000000..7eef150
+--- /dev/null
++++ b/node_modules/@capacitor/local-notifications/android/src/main/kotlin/com/capacitorjs/plugins/localnotifications/GbOnTime.kt
+@@ -0,0 +1,85 @@
++package com.capacitorjs.plugins.localnotifications
++
++import android.app.AlarmManager
++import android.app.PendingIntent
++import android.content.Context
++import android.content.Intent
++import android.os.Build
++import android.util.Log
++
++/**
++ * Growth Buddy patch: a one-shot reminder that rings on the minute on OEMs that delay exact alarms.
++ *
++ * OnePlus/ColorOS gives every exact alarm of an app not on its own list a delivery window of 75% of
++ * the lead time, capped at 1 h (dumpsys alarm: window=+1h0m0s, exactAllowReason=policy_permission),
++ * so a 13:30 reminder could ring at 14:29. Battery "Unrestricted" does not change that. An alarm
++ * clock is exact everywhere, but the status bar shows an alarm icon while one is queued.
++ *
++ * So: hops first, the alarm clock last. A hop is an ordinary exact alarm placed so that even its
++ * latest delivery lands before the due time; each hop that fires places the next one closer. Once
++ * the due time is CLOCK_LEAD_MS away, the last hop is an alarm clock for the due time itself: the
++ * icon shows for those few minutes only. Every hop is the reminder's own PendingIntent (same
++ * request code, same receiver; extras do not count), so cancel() still clears whichever is queued,
++ * and a reboot re-arms through the plugin's restore path. Stock Android, where windows are 0, just
++ * takes a few extra wake-ups. iOS needs none of this: the OS delivers a scheduled notification itself.
++ */
++internal object GbOnTime {
++    const val DUE_KEY = "GrowthBuddy.due"
++    private const val TAG = "GbOnTime"
++
++    // Last stretch on the alarm clock: the icon's visible time before each reminder.
++    private const val CLOCK_LEAD_MS = 5 * 60_000L
++    // A hop's latest delivery lands this long before the due time.
++    private const val MARGIN_MS = 60_000L
++    // The OEM window as measured: 75% of the lead, never more than an hour.
++    private const val WINDOW_RATIO = 0.75
++    private const val WINDOW_CAP_MS = 60 * 60_000L
++    // A receiver this close to the due time posts instead of hopping again.
++    private const val ON_TIME_MS = 1_000L
++
++    /** Queue `intent` (the TimedNotificationPublisher broadcast for `id`) to fire at `due`. */
++    fun arm(context: Context, intent: Intent, id: Int, due: Long) {
++        intent.putExtra(DUE_KEY, due)
++        var flags = PendingIntent.FLAG_CANCEL_CURRENT
++        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) flags = flags or PendingIntent.FLAG_MUTABLE
++        val pi = PendingIntent.getBroadcast(context, id, intent, flags)
++        val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
++        val now = System.currentTimeMillis()
++        if (due - now <= CLOCK_LEAD_MS) {
++            am.setAlarmClock(AlarmManager.AlarmClockInfo(due, showIntent(context)), pi)
++            Log.i(TAG, "id $id: alarm clock for $due")
++            return
++        }
++        val latest = due - MARGIN_MS
++        // Latest delivery of a hop at h is h + min(0.75 * (h - now), 1 h); keep it <= latest.
++        val hop = if (latest - now >= WINDOW_CAP_MS / WINDOW_RATIO + WINDOW_CAP_MS) {
++            latest - WINDOW_CAP_MS
++        } else {
++            now + ((latest - now) / (1 + WINDOW_RATIO)).toLong()
++        }
++        am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, hop, pi)
++        Log.i(TAG, "id $id: hop at $hop for $due")
++    }
++
++    /** In the receiver: true when this was a hop and the next one is queued (post nothing yet). */
++    fun hopAgain(context: Context, intent: Intent, id: Int): Boolean {
++        val due = intent.getLongExtra(DUE_KEY, 0L)
++        if (due <= 0L) return false
++        val now = System.currentTimeMillis()
++        if (due - now <= ON_TIME_MS) {
++            Log.i(TAG, "id $id: due $due, posted at $now (${now - due} ms)")
++            return false
++        }
++        arm(context, intent.clone() as Intent, id, due)
++        return true
++    }
++
++    // Tapping the alarm icon's "next alarm" opens the app. Its own action, so it never matches
++    // (and FLAG_UPDATE_CURRENT never rewrites) a notification's tap intent for the launcher activity.
++    private fun showIntent(context: Context): PendingIntent {
++        val launch = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: Intent()
++        val show = Intent("com.growthbuddy.SHOW_FROM_ALARM").setComponent(launch.component)
++        return PendingIntent.getActivity(context, 0, show,
++            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
++    }
++}
 diff --git a/node_modules/@capacitor/local-notifications/android/src/main/kotlin/com/capacitorjs/plugins/localnotifications/LocalNotificationManager.kt b/node_modules/@capacitor/local-notifications/android/src/main/kotlin/com/capacitorjs/plugins/localnotifications/LocalNotificationManager.kt
-index 72c31a7..71248e5 100644
+index 72c31a7..733f4fc 100644
 --- a/node_modules/@capacitor/local-notifications/android/src/main/kotlin/com/capacitorjs/plugins/localnotifications/LocalNotificationManager.kt
 +++ b/node_modules/@capacitor/local-notifications/android/src/main/kotlin/com/capacitorjs/plugins/localnotifications/LocalNotificationManager.kt
 @@ -251,13 +251,20 @@ class LocalNotificationManager(
@@ -30,3 +121,34 @@ index 72c31a7..71248e5 100644
                  val actionBuilder = NotificationCompat.Action.Builder(
                      R.drawable.ic_transparent,
                      notificationAction.title,
+@@ -320,6 +327,9 @@ class LocalNotificationManager(
+             if (schedule.isRepeating()) {
+                 val interval = at.time - Date().time
+                 alarmManager.setRepeating(AlarmManager.RTC, at.time, interval, pendingIntent)
++            } else if (request.isExactNotification && schedule.allowWhileIdle() && canScheduleExactAlarms(alarmManager)) {
++                // Growth Buddy patch: on time despite OEM alarm windows; see GbOnTime.
++                GbOnTime.arm(context, notificationIntent, requestId, at.time)
+             } else {
+                 setExactIfPossible(alarmManager, request, at.time, pendingIntent)
+             }
+diff --git a/node_modules/@capacitor/local-notifications/android/src/main/kotlin/com/capacitorjs/plugins/localnotifications/TimedNotificationPublisher.kt b/node_modules/@capacitor/local-notifications/android/src/main/kotlin/com/capacitorjs/plugins/localnotifications/TimedNotificationPublisher.kt
+index 52def58..6353d19 100644
+--- a/node_modules/@capacitor/local-notifications/android/src/main/kotlin/com/capacitorjs/plugins/localnotifications/TimedNotificationPublisher.kt
++++ b/node_modules/@capacitor/local-notifications/android/src/main/kotlin/com/capacitorjs/plugins/localnotifications/TimedNotificationPublisher.kt
+@@ -29,12 +29,14 @@ class TimedNotificationPublisher : BroadcastReceiver() {
+         }
+         if (notification == null) return
+ 
+-        notification.`when` = System.currentTimeMillis()
+-
+         val id = intent.getIntExtra(LocalNotificationManager.NOTIFICATION_INTENT_KEY, Int.MIN_VALUE)
+         if (id == Int.MIN_VALUE) {
+             Logger.error(Logger.tags("LN"), "No valid id supplied", null)
+         }
++        // Growth Buddy patch: an early hop queues the next one and posts nothing; see GbOnTime.
++        if (GbOnTime.hopAgain(context, intent, id)) return
++
++        notification.`when` = System.currentTimeMillis()
+         val storage = NotificationStorage(context)
+         val notificationJson = storage.getSavedNotificationAsJSObject(id.toString())
+         LocalNotificationsPlugin.fireReceived(notificationJson)
