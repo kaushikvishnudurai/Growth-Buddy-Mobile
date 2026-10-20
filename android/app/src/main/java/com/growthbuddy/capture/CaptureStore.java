@@ -32,8 +32,12 @@ final class CaptureStore {
 
     static final int MAX = 200;
     static final long MAX_AGE_MS = 3L * 24 * 60 * 60 * 1000;
-    /** The same text from the same app this close together is a repost, not a second payment. */
-    static final long REPOST_MS = 10L * 60 * 1000;
+    /**
+     * The same text from the same app with the same event time is a repost. Only
+     * that: two payments whose notifications read alike ("Rs 10 paid to Chai Point")
+     * minutes apart are two, and each is kept.
+     */
+    static final long REPOST_MS = 1000;
 
     private static final Pattern AMOUNT = Pattern.compile("(?i)(?:₹|rs\\.?|inr)\\s*[0-9]");
     private static final Pattern MONEY_WORD = Pattern.compile(

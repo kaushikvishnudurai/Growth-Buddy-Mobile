@@ -167,7 +167,9 @@ Web side: `scripts/capture.js`, `capture-ui.js`, `bank-msg.js` (the parser) in .
   for `takeShared()` / fires `shared`. A bank SMS becomes a capture, other text opens Quick add.
 - **Queue** — `CaptureStore`: `noBackupFilesDir()/gb_capture.json` (never in cloud backup), at most 200
   items, 3 days; the web side `peek()`s, sends only the parsed fields, then `ack()`s. Switching a source off
-  drops what it queued.
+  drops what it queued. A notification is queued with its own event time (`when`): a repost keeps it and is
+  dropped, a second payment that reads alike gets its own and is kept. The switches follow the account's
+  (the web side calls `setSources` from `GET /api/capture` once per user and on opening Settings).
 
 ### SMS capture release (its own release, not mixed into a fix build)
 

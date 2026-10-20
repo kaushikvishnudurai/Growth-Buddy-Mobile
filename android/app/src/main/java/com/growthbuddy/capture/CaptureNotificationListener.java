@@ -47,6 +47,9 @@ public class CaptureNotificationListener extends NotificationListenerService {
         CharSequence body = big != null ? big : x.getCharSequence(Notification.EXTRA_TEXT);
         String text = ((title == null ? "" : title) + "\n" + (body == null ? "" : body)).trim();
         if (!CaptureStore.looksLikePayment(text)) return;
-        CaptureStore.add(this, "notif", sbn.getPackageName(), text, sbn.getPostTime());
+        // The app's own event time: a repost or an update of one notification keeps it,
+        // a second payment gets its own, even when the two read exactly alike.
+        long at = n.when > 0 ? n.when : sbn.getPostTime();
+        CaptureStore.add(this, "notif", sbn.getPackageName(), text, at);
     }
 }
