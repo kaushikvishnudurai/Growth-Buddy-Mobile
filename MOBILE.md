@@ -151,3 +151,43 @@ the activity, whenever the app declares a receiver for it. `NotificationActionRe
 through `NotificationActionsPlugin.setAuth`, and re-posts a snoozed card at `snoozedUntil`.
 Upgrading `@capacitor/local-notifications`: re-check that the patch still applies (`npm i` fails
 loudly if not). iOS is unpatched: its buttons are `foreground` and open the app.
+
+## Money's automatic capture (Android, `com.growthbuddy.capture`)
+
+Web side: `scripts/capture.js`, `capture-ui.js`, `bank-msg.js` (the parser) in ../Growth-Buddy; server
+`money/CaptureService`. `CapturePlugin` (registered in `MainActivity`) is the bridge, as `GbCapture`.
+
+- **Payment app alerts** — `CaptureNotificationListener` (manifest `<service>`, bound only after the user
+  turns on this app's "Notification access", which the app asks for behind its own consent card). It keeps
+  text only from `APPS` (GPay, PhonePe, Paytm, BHIM, CRED, HDFC, ICICI iMobile, SBI YONO, Axis, Kotak), and
+  only when it looks like a payment. Messaging apps are deliberately not in the list (reading SMS through
+  their notifications would sidestep Play's SMS review). No Play declaration form exists for it; the
+  in-app consent card is the User Data policy's prominent disclosure.
+- **Share to Growth Buddy** — `MainActivity`'s `ACTION_SEND text/plain` filter; the plugin keeps the text
+  for `takeShared()` / fires `shared`. A bank SMS becomes a capture, other text opens Quick add.
+- **Queue** — `CaptureStore`: `noBackupFilesDir()/gb_capture.json` (never in cloud backup), at most 200
+  items, 3 days; the web side `peek()`s, sends only the parsed fields, then `ack()`s. Switching a source off
+  drops what it queued. A notification is queued with its own event time (`when`): a repost keeps it and is
+  dropped, a second payment that reads alike gets its own and is kept. The switches follow the account's
+  (the web side calls `setSources` from `GET /api/capture` once per user and on opening Settings).
+
+### SMS capture release (its own release, not mixed into a fix build)
+
+The code ships in every build (`CaptureSmsReceiver`, `readSmsInbox`); the manifest entries do not, because
+Play holds the **whole release** in review (up to several weeks) once READ_SMS / RECEIVE_SMS appear.
+
+1. In `AndroidManifest.xml`, uncomment the `CaptureSmsReceiver` `<receiver>` and the two SMS
+   `<uses-permission>` lines (both marked "SMS capture release ONLY").
+2. Bump `versionCode`, build the bundle, upload to a new release.
+3. Play Console > App content > **Permissions declaration**: use case **SMS-based money management**;
+   core feature = "Money fills in spends from the user's bank SMS; parsed on the device, only amount,
+   payee, day, last 4 digits and a reference fingerprint are sent". Attach a **video** (switch on Bank SMS
+   in Settings > Layout > Money > Automatic capture, the consent sheet, Android's prompt, the 90-day read,
+   rows appearing in Money, turning it off and deleting). Add the review test account.
+4. Data safety: SMS = processed on device, not collected; financial info (amounts, payees) = collected,
+   not shared, user can delete. The Financial features declaration (personal finance: budgeting) too.
+5. If refused, ship the next build with the lines commented again; payment app alerts keep working.
+
+Needs a real phone test (no emulator here): notification access per OEM (OnePlus/Xiaomi battery savers can
+kill listeners), each app's real notification wording against `scripts/bank-msg.cases.json`, Android 15 OTP
+redaction, the share sheet, and the SMS release's permission prompt + backfill.

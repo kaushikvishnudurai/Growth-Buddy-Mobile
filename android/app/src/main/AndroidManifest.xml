@@ -19,7 +19,42 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- "Share to Growth Buddy" for text: a bank SMS shared in is captured
+                 into Money (CapturePlugin), any other text opens Quick add. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
         </activity>
+
+        <!-- Money's automatic capture: UPI and bank app payment notifications
+             (CaptureNotificationListener.APPS only). Bound by Android only after the
+             user turns on this app's "Notification access", which the app asks for
+             behind its own consent card. No Play declaration form exists for it; the
+             in-app disclosure is what the User Data policy requires. -->
+        <service
+            android:name="com.growthbuddy.capture.CaptureNotificationListener"
+            android:label="@string/app_name"
+            android:exported="true"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <!-- SMS capture release ONLY (MOBILE.md, "SMS capture release"). Uncomment
+             together with the two SMS permissions at the end of this file, in a
+             release of its own: Play holds the whole release while it reviews them.
+        <receiver
+            android:name="com.growthbuddy.capture.CaptureSmsReceiver"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_SMS">
+            <intent-filter>
+                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            </intent-filter>
+        </receiver>
+        -->
 
         <!-- Notification buttons (Done, Snooze, +250 ml) handled without opening
              the app. The patched LocalNotifications plugin (patches/) sends a press
@@ -141,4 +176,10 @@
     <uses-permission android:name="android.permission.health.READ_NUTRITION" tools:node="remove" />
     <uses-permission android:name="android.permission.health.WRITE_NUTRITION" tools:node="remove" />
     <uses-permission android:name="android.permission.health.READ_EXERCISE" />
+
+    <!-- SMS capture release ONLY (see the receiver above and MOBILE.md). Use case
+         on the Play declaration form: "SMS-based money management".
+    <uses-permission android:name="android.permission.READ_SMS" />
+    <uses-permission android:name="android.permission.RECEIVE_SMS" />
+    -->
 </manifest>
